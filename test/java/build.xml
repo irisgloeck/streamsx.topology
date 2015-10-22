@@ -1,0 +1,301 @@
+<project name="streamsx.topology.test" default="all" basedir="."
+    xmlns:jacoco="antlib:org.jacoco.ant"
+    >
+    <description>
+        Testing
+    </description>
+
+  <import file="../../common-build.xml"/>
+
+  <property name="topology.test.showoutput" value="no"/>
+  <property name="topology.test.haltonfailure" value="yes"/>
+	
+  <property name="classes" location="classes"/>
+  <property name="jarname" value="streamsx.topology.test.jar"/>
+  <property name="test.dir" location="unittests"/>
+  <property name="report.dir" location="report"/>
+  <property name="topology.src.dir" location="../../java/src"/>
+  <property name="samples.src.dir" location="../../samples/java/functional/src"/>
+  <property name="samples.jar" location="../../samples/java/functional/functionalsamples.jar"/>
+  <property name="testtk" location="../spl/testtk"/>
+  <property name="testtk.java" location="${testtk}/impl/java"/>
+
+    <property name="topology.install.compile" value="${env.STREAMS_INSTALL}"/>
+    <echo message="Streams compile install: ${topology.install.compile}"/>
+
+  <path id="compile.classpath">
+    <pathelement location="${tk.lib}/com.ibm.streamsx.topology.jar" />
+    <pathelement location="${samples.jar}"/>
+    <pathelement location="resources/ThirdPartyResource.jar"/>
+    <pathelement location="resources/classes/ThirdParty"/>
+    <pathelement location="${testtk.java}/bin"/>
+    <pathelement location="${junit.jar}"/>
+    <path refid="streams.classpath"/>
+  </path>
+
+  <path id="test.classpath">
+    <pathelement location="${jarname}" />
+    <pathelement location="${tk.lib}/com.ibm.streamsx.topology.jar" />
+    <pathelement location="resources/ThirdPartyResource.jar"/>
+    <pathelement location="resources/classes/ThirdParty"/>
+    <pathelement location="${testtk.java}/bin"/>
+    <path refid="streams.classpath"/>
+  </path>
+  <path id="test.sample.classpath">
+    <pathelement location="${samples.jar}"/>
+    <path refid="test.classpath"/>
+  </path>
+
+  <target name="all" depends="test.toolkit,jar"/>
+
+  <target name="init">
+    <mkdir dir="${classes}"/>
+  </target>
+
+  <target name="compile" depends="init">
+    <javac debug="true" 
+           includeantruntime="no"
+	   srcdir="${basedir}/src" 
+	   destdir="${classes}"
+	   classpathref="compile.classpath"
+	   excludes="**/VwapTest.java **/BundleSamplesTest.java"
+	   />
+    <ant dir="../scala" target="all" useNativeBasedir="true" inheritAll="no">
+       <property name="topology.install.compile" value="${topology.install.compile}"/>
+    </ant>
+  </target>
+  <target name="jar" depends="compile">
+    <jar destfile="${jarname}" basedir="${classes}"/>
+  </target>
+
+  <target name="test.toolkit">
+    <mkdir dir="${testtk.java}/bin"/>
+    <javac debug="true"
+   	   srcdir="${testtk.java}/src"
+   	   destdir="${testtk.java}/bin"
+   	   classpathref="compile.classpath"
+       includeantruntime="no"
+   	   />
+   <exec executable="${streams.install}/bin/spl-make-toolkit">
+     <arg value="-i"/>
+     <arg value="${testtk}"/>
+   </exec>
+   </target>
+	
+  <target name="test.toolkit.clean">
+  	<delete file="${testtk}/toolkit.xml"/>
+  	<delete dir="${testtk}/testjava"/>
+  	<delete dir="${testtk.java}/bin"/>
+  	<delete dir="${testtk.java}/bin"/>
+  </target>
+
+
+  <target name="clean" depends="test.toolkit.clean">
+    <delete dir="${classes}"/>
+    <delete file="${jarname}"/>
+    <delete dir="${test.dir}"/>
+    <delete dir="${report.dir}"/>
+  </target>
+
+  <target name="unittest.quick">
+     <property name="topology.test.sc_ok" value="false"/>
+     <property name="topology.test.perf_ok" value="false"/>
+     <property name="topology.test.coverage" value="false"/>
+     <antcall target="unittest"/>
+  </target>
+
+  <target name="unittest" depends="unittest.main,unittest.standalone">
+     <fail message="Unittests failed" if="topology.tests.failed"/>
+  </target>
+
+  <target name="unittest.main">
+     <antcall target="unittest.base" inheritAll="no">
+       <param name="topology.test.type" value="EMBEDDED_TESTER"/>
+     </antcall>
+  </target>
+
+  <target name="unittest.standalone">
+     <antcall target="unittest.base" inheritAll="no">
+       <param name="topology.test.type" value="STANDALONE_TESTER"/>
+     </antcall>
+  </target>
+
+  <target name="unittest.distributed">
+     <antcall target="unittest.base" inheritAll="no">
+       <param name="topology.test.type" value="DISTRIBUTED_TESTER"/>
+     </antcall>
+     <fail message="Unittests failed" if="topology.tests.failed"/>
+  </target>
+
+  <target name="unittest.base.scala">
+    <ant dir="../scala" target="unittest" useNativeBasedir="true" inheritAll="no">
+     <property name="topology.test.type" value="${topology.test.type}"/>
+     <property name="topology.install.compile" value="${topology.install.compile}"/>
+    </ant>
+  </target>
+
+  <!-- Allow the pattern of tests to run be set
+       ant -Dtopology.tes.base.pattern='**/WindowTest.java'
+  -->
+  <property name="topology.test.base.pattern" value="**/*Test.java"/>
+
+  <target name="unittest.base" depends="jar,unittest.base.scala">
+     <mkdir dir="${test.dir}"/>
+     <tempfile property="topology.test.dir" prefix="testrun" destDir="${test.dir}"/>
+     <mkdir dir="${topology.test.dir}"/>
+     <property name="topology.test.sc_ok" value="true"/>
+     <property name="topology.test.perf_ok" value="true"/>
+     <property name="topology.test.coverage" value="true"/>
+     <property name="topology.test.resource_dir" location="resources"/>
+   <jacoco:coverage enabled="${topology.test.coverage}">
+     <junit fork="yes" dir="${topology.test.dir}" printsummary="yes" showoutput="${topology.test.showoutput}"
+           haltonfailure="${topology.test.haltonfailure}" failureproperty="topology.tests.failed">
+       <sysproperty key="topology.test.root" value="${topology.test.root}"/>
+       <sysproperty key="topology.test.type" value="${topology.test.type}"/>
+       <sysproperty key="topology.test.sc_ok" value="${topology.test.sc_ok}"/>
+       <sysproperty key="topology.test.perf_ok" value="${topology.test.perf_ok}"/>
+       <sysproperty key="topology.test.resource_dir" file="resources"/>
+       
+       <classpath>
+         <path refid="test.classpath"/>
+       </classpath>
+       <assertions><enable/></assertions>
+       <formatter type="xml"/>
+       <batchtest todir="${topology.test.dir}">
+          <fileset dir="${basedir}/src" 
+          	 excludes="**/samples/*Test.java,**/test/messaging/" >
+             <include name="${topology.test.base.pattern}"/>
+          </fileset>
+       </batchtest>
+     </junit>
+   </jacoco:coverage>
+   <jacoco:coverage enabled="${topology.test.coverage}">
+     <junit fork="yes" dir="${topology.test.dir}" printsummary="yes"
+           haltonfailure="${topology.test.haltonfailure}" failureproperty="topology.tests.failed">
+       <sysproperty key="topology.test.root" value="${topology.test.root}"/>
+       <sysproperty key="topology.test.type" value="${topology.test.type}"/>
+       <sysproperty key="topology.test.sc_ok" value="${topology.test.sc_ok}"/>
+       <sysproperty key="topology.test.perf_ok" value="${topology.test.perf_ok}"/>
+       <classpath>
+         <path refid="test.sample.classpath"/>
+       </classpath>
+       <assertions><enable/></assertions>
+       <formatter type="xml"/>
+       <batchtest todir="${topology.test.dir}">
+          <fileset dir="${classes}">
+             <include name="**/samples/*Test.class"/>
+          </fileset>
+       </batchtest>
+     </junit>
+   </jacoco:coverage>
+   </target>
+
+  <target name="unittest.kafka.standalone">
+     <property name="topology.test.type" value="STANDALONE_TESTER"/>
+     <antcall target="unittest.kafka.base"/>
+  </target>
+
+  <target name="unittest.kafka.distributed">
+     <property name="topology.test.type" value="DISTRIBUTED_TESTER"/>
+     <antcall target="unittest.kafka.base"/>
+  </target>
+
+  <target name="unittest.kafka.base">
+     <echo message="See com.ibm.streamsx.topology.test.messaging.kafka.package-info.java for required configuration information."/>
+     <property name="topology.test.showoutput" value="yes"/>
+     <property name="topology.test.include.name" value="**/kafka/*Test.java"/>
+     <antcall target="unittest.simple"/>
+  	 <condition property="topology.test.isStandalone">
+        <equals arg1="${topology.test.type}" arg2="STANDALONE_TESTER" />
+  	 </condition>
+  	 <antcall target="-warnOrphanedStandalone"/>
+     <fail message="Unittests failed" if="topology.tests.failed"/>
+  </target>
+	
+  <target name="-warnOrphanedStandalone" if="topology.test.isStandalone">
+     <echo >REMEMBER TO LOCATE AND TERMINATE orphaned standalone processes.</echo>
+  </target>
+
+  <target name="unittest.mqtt.standalone">
+     <property name="topology.test.type" value="STANDALONE_TESTER"/>
+     <antcall target="unittest.mqtt.base"/>
+  </target>
+	 
+  <target name="unittest.mqtt.distributed">
+    <property name="topology.test.type" value="DISTRIBUTED_TESTER"/>
+     <antcall target="unittest.mqtt.base"/>
+  </target>
+
+  <target name="unittest.mqtt.base">
+     <echo message="See com.ibm.streamsx.topology.test.messaging.mqtt.package-info.java for required configuration information."/>
+     <property name="topology.test.showoutput" value="yes"/>
+     <property name="topology.test.include.name" value="**/mqtt/*Test.java"/>
+     <antcall target="unittest.simple"/>
+     <fail message="Unittests failed" if="topology.tests.failed"/>
+  </target>
+
+  <target name="unittest.simple" depends="jar">
+     <mkdir dir="${test.dir}"/>
+     <tempfile property="topology.test.dir" prefix="testrun" destDir="${test.dir}"/>
+     <mkdir dir="${topology.test.dir}"/>
+     <property name="topology.test.include.name" value="ERROR-CALLER-MUST-SPECIFY"/>
+     <property name="topology.test.type" value="EMBEDDED_TESTER"/>
+     <property name="topology.test.sc_ok" value="true"/>
+     <property name="topology.test.perf_ok" value="true"/>
+     <property name="topology.test.coverage" value="true"/>
+     <property name="topology.test.resource_dir" location="resources"/>
+   <jacoco:coverage enabled="${topology.test.coverage}">
+     <junit fork="yes" dir="${topology.test.dir}" printsummary="yes" showoutput="${topology.test.showoutput}"
+           haltonfailure="${topology.test.haltonfailure}" failureproperty="topology.tests.failed">
+       <sysproperty key="topology.test.root" value="${topology.test.root}"/>
+       <sysproperty key="topology.test.type" value="${topology.test.type}"/>
+       <sysproperty key="topology.test.sc_ok" value="${topology.test.sc_ok}"/>
+       <sysproperty key="topology.test.perf_ok" value="${topology.test.perf_ok}"/>
+       <sysproperty key="topology.test.resource_dir" file="resources"/>
+       
+       <classpath>
+         <path refid="test.classpath"/>
+       </classpath>
+       <assertions><enable/></assertions>
+       <formatter type="xml"/>
+       <batchtest todir="${topology.test.dir}">
+          <fileset dir="${basedir}/src">
+             <include name="${topology.test.include.name}"/>
+          </fileset>
+       </batchtest>
+     </junit>
+   </jacoco:coverage>
+   </target>
+
+  <target name="junit.report">
+   <junitreport todir="${test.dir}">
+      <fileset dir="${test.dir}">
+         <include name="**/TEST-*.xml"/>
+      </fileset>
+      <report format="frames" todir="${report.dir}/junit"/>
+   </junitreport>
+  </target>
+
+  <target name="coverage.report" >
+    <jacoco:report>
+      <executiondata>
+        <fileset dir="${test.dir}">
+         <include name="**/jacoco*.exec"/>
+        </fileset>
+      </executiondata>
+    <structure name="streamsx.topology">
+      <classfiles>
+          <file file="${tk.lib}/com.ibm.streamsx.topology.jar"/>
+          <file file="${samples.jar}"/>
+      </classfiles>
+      <sourcefiles encoding="UTF-8">
+          <fileset dir="${topology.src.dir}"/>
+          <fileset dir="${samples.src.dir}"/>
+      </sourcefiles>
+    </structure>
+    <html destdir="${report.dir}/coverage"/>
+    </jacoco:report>
+  </target>
+
+</project>
+

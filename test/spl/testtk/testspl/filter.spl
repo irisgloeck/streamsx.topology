@@ -1,0 +1,31 @@
+namespace testspl;
+
+/**
+  Simple filter to test testing of
+  an SPL composite.
+*/
+public composite Int32Filter(input In; output Out) {
+    param
+        attribute $attr;
+        expression<int32> $value;
+    graph
+    stream<In> Out = Filter(In) {
+       param
+          filter: $attr == $value;
+    }
+}
+
+/**
+  Simple filter to test testing of
+  an SPL operator with multiple outputs.
+*/
+public composite Int32FilterPF(input In; output Pass,Fail) {
+    param
+        attribute $attr;
+        expression<int32> $value;
+    graph
+    (stream<In> Pass;stream<In> Fail) as F = Filter(In) {
+       param
+          filter: $attr == $value;
+    }
+}

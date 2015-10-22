@@ -1,0 +1,97 @@
+<project name="streamsx.topology" default="all" >
+    <description>
+        Build the Streams Java functional api.
+    </description>
+
+  <import file="common-build.xml"/>
+
+  <property name="release.base" location="release-${ant.project.name}" />
+
+  <target name="all">
+    <ant dir="java" inheritAll="true"/>
+    <ant dir="samples/java/functional" inheritAll="true"/>
+    <ant dir="toolkit" inheritAll="true"/>
+    <ant dir="test/java" inheritAll="true"/>
+  </target>
+
+  <target name="clean" >
+    <ant dir="java" target="clean"/>
+    <ant dir="samples/java/functional" target="clean"/>
+    <ant dir="toolkit" target="clean"/>
+    <ant dir="test/java" target="clean"/>
+    <delete dir="${tk}/doc/javadoc"/>
+    <delete dir="${tk}/doc/spldoc"/>
+    <delete dir="${tk}/doc/scaladoc"/>
+    <delete dir="${release.base}"/>
+  </target>
+
+  <target name="test" >
+    <ant dir="test/java" inheritAll="true">
+       <target name="unittest"/>
+       <target name="junit.report"/>
+       <target name="coverage.report"/>
+    </ant>
+  </target>
+
+  <target name="test.quick" >
+    <ant dir="test/java" inheritAll="true">
+       <target name="unittest.quick"/>
+       <target name="junit.report"/>
+    </ant>
+  </target>
+  <target name="test.report" >
+    <ant dir="test/java">
+       <target name="junit.report"/>
+    </ant>
+  </target>
+
+  <!-- Release targets !-->
+  <path id="javadoc.classpath">
+    <path location="${tk.lib}/com.ibm.streamsx.topology.jar"/>
+    <path refid="streams.classpath"/>
+    <path refid="tk.classpath"/>
+  </path>
+
+  <target name="release" depends="clean,all,doc,create_release_bundle"/>
+
+  <target name="doc" depends="checkJava8">
+       <mkdir dir="${tk}/doc"/>
+       <ant dir="samples/java/functional" target="doc"/>
+       <mkdir dir="${tk}/doc/samples/javadoc"/>
+       <copy todir="${tk}/doc/samples/javadoc">
+           <fileset dir="samples/java/functional/javadoc"/>
+       </copy>
+       <javadoc destdir="${tk}/doc/javadoc" classpathref="javadoc.classpath"
+          Overview="java/src/overview.html"
+          Windowtitle="Java Application API for IBM Streams"
+          Footer="streamsx.topology ${streamsx.topology.version} @ IBMStreams GitHub"
+          failonwarning="yes"
+          additionalparam="${disableJavadocLint}"
+          >
+            <fileset dir="java/src">
+               <include name="com/ibm/streamsx/topology/**"/>
+               <exclude name="com/ibm/streamsx/topology/internal/**"/>
+               <exclude name="com/ibm/streamsx/topology/builder/**"/>
+               <exclude name="com/ibm/streamsx/topology/generator/spl/**"/>
+            </fileset>
+       </javadoc>
+       <ant dir="toolkit" target="spldoc"/>
+       <ant dir="scala" target="scaladoc"/>
+
+  </target>
+  <target name="create_release_bundle">
+      <tstamp/>
+      <property name="release.dir" location="${release.base}" />
+      <mkdir dir="${release.dir}" />
+      <property name="releasefilename" value="${release.dir}/streamsx.topology-v1.1-${DSTAMP}-${TSTAMP}.tgz"/>
+      <tar compression="gzip" longfile="gnu" destfile="${releasefilename}"
+         basedir="${basedir}"
+         includes="com.ibm.streamsx.topology/** samples/**"
+         excludes="**/.gitignore" />
+      <checksum file="${releasefilename}"/>
+      <checksum algorithm="sha1" file="${releasefilename}"/>
+  </target>
+
+
+
+</project>
